@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "jp.maki.wallettracker.app-mergeDebugResources-61:/values-h320dp-port-v13/values-h320dp-port-v13.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\newo2\\.gradle\\caches\\9.4.1\\transforms\\08c9a5fedbde7c383221354ab4aae388\\transformed\\material-1.11.0\\res\\values-h320dp-port-v13\\values-h320dp-port-v13.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "63",
+                        "endOffsets": "114"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "jp.maki.wallettracker.app-merged_res-63:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "jp.maki.wallettracker.app-main-65:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "jp.maki.wallettracker.app-merged_res-63:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "jp.maki.wallettracker.app-main-65:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    }
+]

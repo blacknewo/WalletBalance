@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -133,6 +134,20 @@ fun WalletApp(dao: TransactionDao) {
     val balance by viewModel.balance.collectAsState(initial = 0)
     val transactions by viewModel.recentTransactions.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    var scrollTargetId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(transactions, scrollTargetId) {
+        val targetId = scrollTargetId
+        if (targetId != null) {
+            val index = transactions.indexOfFirst { it.id == targetId }
+            if (index >= 0 && !listState.isScrollInProgress) {
+                listState.animateScrollToItem(index)
+            }
+            scrollTargetId = null
+        }
+    }
+
     var showSheet by remember { mutableStateOf(false) }
     var transactionType by remember { mutableStateOf("income") }
     var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
@@ -240,9 +255,10 @@ fun WalletApp(dao: TransactionDao) {
         
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    state = listState
                 ) {
-                    items(transactions) { tx ->
+                    items(items = transactions, key = { it.id }) { tx ->
                         SimpleTransactionItem(tx, onLongClick = {
                             editingTransaction = tx
                             transactionType = tx.type
@@ -265,9 +281,12 @@ fun WalletApp(dao: TransactionDao) {
                 scope.launch {
                     val currentEditing = editingTransaction
                     if (currentEditing != null) {
-                        viewModel.updateTransaction(currentEditing.copy(amount = amount, memo = memo))
+                        val updated = currentEditing.copy(amount = amount, memo = memo)
+                        viewModel.updateTransaction(updated)
+                        scrollTargetId = updated.id
                     } else {
-                        viewModel.insert(Transaction(type = transactionType, amount = amount, memo = memo))
+                        val newId = viewModel.insert(Transaction(type = transactionType, amount = amount, memo = memo))
+                        scrollTargetId = newId
                     }
                     showSheet = false
                     editingTransaction = null

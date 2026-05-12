@@ -1,4 +1,4 @@
-#Tue May 12 15:44:26 JST 2026
+#Tue May 12 15:56:06 JST 2026
 base.0=C\:\\Users\\newo2\\Documents\\WalletBalance\\app\\build\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
 path.0=classes.dex
 renamed.0=classes.dex

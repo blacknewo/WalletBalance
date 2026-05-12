@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "jp.maki.wallettracker.app-mergeReleaseResources-56:/values-port/values-port.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\newo2\\.gradle\\caches\\9.4.1\\transforms\\17fc697a5afa101657d596b8ba7bf461\\transformed\\appcompat-1.6.1\\res\\values-port\\values-port.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "55",
+                        "endOffsets": "106"
+                    }
+                }
+            ]
+        }
+    ]
+}

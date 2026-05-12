@@ -1,0 +1,6 @@
+jp.maki.wallettracker.test.app-androidTest-0 C:\Users\newo2\Documents\WalletBalance\app\build\generated\res\resValues\androidTest\debug
+jp.maki.wallettracker.test.app-updated_navigation_xml-1 C:\Users\newo2\Documents\WalletBalance\app\build\generated\updated_navigation_xml\debugAndroidTest
+jp.maki.wallettracker.test.app-mergeDebugAndroidTestResources-2 C:\Users\newo2\Documents\WalletBalance\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+jp.maki.wallettracker.test.app-mergeDebugAndroidTestResources-3 C:\Users\newo2\Documents\WalletBalance\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+jp.maki.wallettracker.test.app-debugAndroidTest-4 C:\Users\newo2\Documents\WalletBalance\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources
+gradleHome-0 C:\Users\newo2\.gradle

@@ -1,0 +1,8 @@
+jp.maki.wallettracker.app-resValues-0 C:\Users\newo2\Documents\WalletBalance\app\build\generated\res\resValues\release
+jp.maki.wallettracker.app-updated_navigation_xml-1 C:\Users\newo2\Documents\WalletBalance\app\build\generated\updated_navigation_xml\release
+jp.maki.wallettracker.app-packageReleaseResources-2 C:\Users\newo2\Documents\WalletBalance\app\build\intermediates\incremental\release\packageReleaseResources\merged.dir
+jp.maki.wallettracker.app-packageReleaseResources-3 C:\Users\newo2\Documents\WalletBalance\app\build\intermediates\incremental\release\packageReleaseResources\stripped.dir
+jp.maki.wallettracker.app-release-4 C:\Users\newo2\Documents\WalletBalance\app\build\intermediates\merged_res\release\mergeReleaseResources
+jp.maki.wallettracker.app-main-5 C:\Users\newo2\Documents\WalletBalance\app\src\main\res
+jp.maki.wallettracker.app-release-6 C:\Users\newo2\Documents\WalletBalance\app\src\release\res
+gradleHome-0 C:\Users\newo2\.gradle

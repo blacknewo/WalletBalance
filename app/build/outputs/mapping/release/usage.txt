@@ -4925,7 +4925,8 @@ androidx.compose.foundation.text.InlineTextContentKt
 androidx.compose.foundation.text.InternalFoundationTextApi
 androidx.compose.foundation.text.KeyboardActionRunner:
     public final androidx.compose.ui.text.input.TextInputSession getInputSession()
-androidx.compose.foundation.text.KeyboardActionScope
+androidx.compose.foundation.text.KeyboardActionScope:
+    public abstract void defaultKeyboardAction-KlQnJC8(int)
 androidx.compose.foundation.text.KeyboardActions$Companion:
     public static synthetic void getDefault$annotations()
 androidx.compose.foundation.text.KeyboardActions:
@@ -51095,7 +51096,6 @@ androidx.compose.foundation.text.CoreTextFieldKt$CoreTextField$semanticsModifier
 androidx.compose.foundation.text.CoreTextFieldKt$CoreTextField$semanticsModifier$1$4:
     public static java.lang.Boolean invoke$7()
 androidx.compose.foundation.text.CoreTextFieldKt$CoreTextField$semanticsModifier$1$5:
-    public final synthetic androidx.compose.ui.text.input.ImeOptions $imeOptions
     public final java.lang.Boolean invoke()
 androidx.compose.foundation.text.CoreTextFieldKt$CoreTextField$semanticsModifier$1$6:
     public final synthetic boolean $readOnly
@@ -51167,12 +51167,11 @@ androidx.compose.foundation.text.KeyboardActionRunner:
     public static void setFocusManager()
     public static void setInputSession()
     public static void setKeyboardActions()
+androidx.compose.foundation.text.KeyboardActionScope
 androidx.compose.foundation.text.KeyboardActions$Companion
 androidx.compose.foundation.text.KeyboardActions:
     public static final androidx.compose.foundation.text.KeyboardActions$Companion Companion
-    public final kotlin.jvm.functions.Function1 onDone
     public final kotlin.jvm.functions.Function1 onGo
-    public final kotlin.jvm.functions.Function1 onNext
     public final kotlin.jvm.functions.Function1 onPrevious
     public final kotlin.jvm.functions.Function1 onSearch
     public final kotlin.jvm.functions.Function1 onSend
@@ -51186,9 +51185,9 @@ androidx.compose.foundation.text.KeyboardActions:
 androidx.compose.foundation.text.KeyboardOptions$Companion
 androidx.compose.foundation.text.KeyboardOptions:
     public static final androidx.compose.foundation.text.KeyboardOptions$Companion Companion
+    public static final androidx.compose.foundation.text.KeyboardOptions Default
     public final boolean autoCorrect
     public final int capitalization
-    public final int imeAction
     public static final synthetic androidx.compose.foundation.text.KeyboardOptions access$getDefault$cp()
     public static androidx.compose.ui.text.input.ImeOptions toImeOptions$foundation_release()
 androidx.compose.foundation.text.LongPressTextDragObserverKt$detectDownAndDragGesturesWithObserver$2$1:
@@ -51323,7 +51322,6 @@ androidx.compose.foundation.text.TextFieldKeyInput:
 androidx.compose.foundation.text.TextFieldKeyInputKt$textFieldKeyInput$2$1:
     public final java.lang.Boolean invoke-ZmokQxo()
 androidx.compose.foundation.text.TextFieldKeyInputKt$textFieldKeyInput$2:
-    public final synthetic int $imeAction
     public final androidx.compose.ui.Modifier invoke()
 androidx.compose.foundation.text.TextFieldKeyInputKt
 androidx.compose.foundation.text.TextFieldKeyInput_androidKt
@@ -52305,6 +52303,7 @@ androidx.compose.material3.OutlinedTextFieldKt$OutlinedTextField$2:
     public final synthetic kotlin.jvm.functions.Function2 $trailingIcon
     public final void invoke$4()
 androidx.compose.material3.OutlinedTextFieldKt$OutlinedTextField$3:
+    public final synthetic int $$changed1
     public final synthetic int $$changed2
     public final synthetic boolean $isError
     public final synthetic kotlin.jvm.functions.Function2 $leadingIcon
@@ -54203,6 +54202,7 @@ androidx.compose.ui.focus.FocusOrderModifier
 androidx.compose.ui.focus.FocusOwner:
     public abstract void clearFocus()
     public abstract void clearFocus(boolean,boolean)
+    public static void clearFocus$default(androidx.compose.ui.focus.FocusOwner)
     public abstract boolean dispatchInterceptedSoftKeyboardEvent-ZmokQxo()
     public abstract boolean dispatchKeyEvent-ZmokQxo()
     public abstract boolean dispatchRotaryEvent()
@@ -58432,7 +58432,6 @@ androidx.compose.ui.text.input.ImeOptions:
     public static final androidx.compose.ui.text.input.ImeOptions$Companion Companion
     public final boolean autoCorrect
     public final int capitalization
-    public final int imeAction
     public static final synthetic androidx.compose.ui.text.input.ImeOptions access$getDefault$cp()
     public static boolean getAutoCorrect()
     public static int getCapitalization-IUNYP9k()
@@ -65173,7 +65172,7 @@ jp.maki.wallettracker.MainActivityKt$$InternalSyntheticLambda$6$ab53ecbd33012d51
 jp.maki.wallettracker.MainActivityKt$$InternalSyntheticLambda$6$c675ccb753dea471b5d05677f1e5ff3a3b1128508af7cb9b17f0d24e182b1396$1:
     public final synthetic int f$5
     public final synthetic int f$6
-jp.maki.wallettracker.MainActivityKt$$InternalSyntheticLambda$6$e0ae3d2b14f835a11473cca2898bf2043001f2644280fdeb18e34ffb3893a81f$7:
+jp.maki.wallettracker.MainActivityKt$$InternalSyntheticLambda$7$e0ae3d2b14f835a11473cca2898bf2043001f2644280fdeb18e34ffb3893a81f$9:
     public final synthetic int f$4
     public final synthetic int f$5
 jp.maki.wallettracker.MainActivityKt$InputOverlay$1$5$1:

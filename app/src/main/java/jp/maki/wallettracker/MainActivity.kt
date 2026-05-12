@@ -20,12 +20,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
@@ -42,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -456,6 +459,7 @@ fun InputOverlay(
     onDelete: (Transaction) -> Unit
 ) {
     if (visible) {
+        val focusManager = LocalFocusManager.current
         // 表示されるたびにオフセットをリセット
         var dragOffsetY by remember(visible) { mutableStateOf(0f) }
 
@@ -473,7 +477,10 @@ fun InputOverlay(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) { onDismiss() }
+                    ) { 
+                        focusManager.clearFocus(force = true)
+                        onDismiss() 
+                    }
             )
 
             // フォームパネル
@@ -500,6 +507,7 @@ fun InputOverlay(
                         },
                         onDragStopped = {
                             if (dragOffsetY > 300) {
+                                focusManager.clearFocus(force = true)
                                 onDismiss()
                             } else {
                                 dragOffsetY = 0f
@@ -525,8 +533,14 @@ fun InputOverlay(
                     InputForm(
                         type = type,
                         transaction = transaction,
-                        onSave = onSave,
-                        onDelete = onDelete
+                        onSave = { amount, memo ->
+                            focusManager.clearFocus(force = true)
+                            onSave(amount, memo)
+                        },
+                        onDelete = { tx ->
+                            focusManager.clearFocus(force = true)
+                            onDelete(tx)
+                        }
                     )
                 }
             }
@@ -541,6 +555,9 @@ fun InputForm(
     onSave: (Int, String) -> Unit,
     onDelete: (Transaction) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val memoFocusRequester = remember { FocusRequester() }
+
     // 修正モードなら既存の値を、新規なら空をセット
     var amountText by rememberSaveable(transaction) { 
         mutableStateOf(transaction?.amount?.toString() ?: "") 
@@ -581,7 +598,13 @@ fun InputForm(
             onValueChange = { if (it.all { char -> char.isDigit() }) amountText = it },
             label = { Text("金額 (¥)") },
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { memoFocusRequester.requestFocus() }
+            ),
             singleLine = true,
             textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
         )
@@ -592,7 +615,15 @@ fun InputForm(
             value = memoText,
             onValueChange = { memoText = it },
             label = { Text("メモ (任意)") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(memoFocusRequester),
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            ),
             singleLine = true
         )
 

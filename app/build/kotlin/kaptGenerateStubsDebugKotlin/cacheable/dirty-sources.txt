@@ -1,2 +1,0 @@
-C:\Users\newo2\Documents\WalletBalance\app\src\main\java\jp\maki\wallettracker\MainActivity.kt
-C:\Users\newo2\Documents\WalletBalance\app\src\main\java\jp\maki\wallettracker\Database.kt

@@ -287,6 +287,7 @@ fun WalletApp(dao: TransactionDao) {
     var showReconciliationDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf<Transaction?>(null) }
     var showRestoreConfirmDialog by remember { mutableStateOf<Uri?>(null) }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     // リストア: ファイルピッカーのランチャー
     val restoreLauncher = rememberLauncherForActivityResult(
@@ -367,6 +368,14 @@ fun WalletApp(dao: TransactionDao) {
                                 onClick = {
                                     showMenu = false
                                     showResetDialog = true
+                                }
+                            )
+                            Divider()
+                            DropdownMenuItem(
+                                text = { Text("アプリについて", color = Color.Gray) },
+                                onClick = {
+                                    showMenu = false
+                                    showAboutDialog = true
                                 }
                             )
                         }
@@ -598,6 +607,55 @@ fun WalletApp(dao: TransactionDao) {
                 dismissButton = {
                     TextButton(onClick = { showRestoreConfirmDialog = null }) {
                         Text("キャンセル")
+                    }
+                }
+            )
+        }
+
+        // アプリについてダイアログ
+        if (showAboutDialog) {
+            val buildType = if (BuildConfig.DEBUG) "DEBUG" else "RELEASE"
+            val buildTypeColor = if (BuildConfig.DEBUG) Color(0xFFD43C35) else Color(0xFF008433)
+            AlertDialog(
+                onDismissRequest = { showAboutDialog = false },
+                title = { Text("アプリについて", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "まきちゃんのお小遣い帳",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "バージョン",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = BuildConfig.VERSION_NAME,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "ビルド",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = buildType,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = buildTypeColor
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { showAboutDialog = false }) {
+                        Text("閉じる")
                     }
                 }
             )

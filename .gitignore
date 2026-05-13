@@ -1,0 +1,5 @@
+# キーストアファイル（絶対にコミットしない）
+*.jks
+*.keystore
+# 署名情報を含む gradle.properties（絶対にコミットしない）
+gradle.properties

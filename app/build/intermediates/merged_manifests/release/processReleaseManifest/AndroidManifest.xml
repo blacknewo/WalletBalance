@@ -8,6 +8,11 @@
         android:minSdkVersion="24"
         android:targetSdkVersion="34" />
 
+    <!-- Android 9 (API 28) 以下でのダウンロードフォルダ書き込みに必要 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <permission
         android:name="jp.maki.wallettracker.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />

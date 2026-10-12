@@ -19,7 +19,10 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY createdAt DESC")
     fun getAllFlow(): Flow<List<Transaction>>
 
-    @Query("SELECT * FROM transactions ORDER BY createdAt DESC LIMIT 10")
+    @Query("SELECT * FROM transactions ORDER BY createdAt DESC LIMIT :limit")
+    fun getRecentFlow(limit: Int): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions ORDER BY createdAt DESC LIMIT 20")
     fun getRecentFlow(): Flow<List<Transaction>>
 
     @Insert

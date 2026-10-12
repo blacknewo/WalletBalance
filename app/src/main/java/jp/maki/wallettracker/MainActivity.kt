@@ -2,6 +2,7 @@ package jp.maki.wallettracker
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -71,120 +72,11 @@ import java.text.NumberFormat
 import java.util.*
 import kotlin.math.roundToInt
 
-// ==============================================================
-// バックアップ / リストア ヘルパー関数
-// ==============================================================
-
-/**
- * Transaction リストを JSON 文字列に変換する。
- * 形式: [{"id":1, "type":"income", "amount":1000, "memo":"...", "createdAt":...}, ...]
- */
-fun transactionsToJson(transactions: List<Transaction>): String {
-    val array = JSONArray()
-    for (tx in transactions) {
-        val obj = JSONObject()
-        obj.put("id", tx.id)
-        obj.put("type", tx.type)
-        obj.put("amount", tx.amount)
-        obj.put("memo", tx.memo)
-        obj.put("createdAt", tx.createdAt)
-        array.put(obj)
-    }
-    return array.toString(2) // インデント付きで読みやすく
-}
-
-/**
- * JSON 文字列を Transaction リストに変換する。
- * パース失敗時は null を返す（呼び出し元でエラーハンドリング）。
- */
-fun jsonToTransactions(json: String): List<Transaction>? {
-    return try {
-        val array = JSONArray(json)
-        val list = mutableListOf<Transaction>()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            list.add(
-                Transaction(
-                    // id は Room が自動採番するため 0 を渡し、insert 時に新規 ID が振られる
-                    id = 0,
-                    type = obj.getString("type"),
-                    amount = obj.getInt("amount"),
-                    memo = obj.optString("memo", ""),
-                    createdAt = obj.getLong("createdAt")
-                )
-            )
-        }
-        list
-    } catch (e: Exception) {
-        null
-    }
-}
-
-/**
- * ダウンロードフォルダに MakiWallet.json を書き出す（バックアップ）。
- * Android 10 以上: MediaStore 経由。
- * Android 9 以下: 直接ファイルアクセス。
- * @return 成功時 true、失敗時 false
- */
-fun performBackup(context: Context, jsonContent: String): Boolean {
-    return try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10 (API 29) 以上: MediaStore を使用
-            val resolver = context.contentResolver
-            val fileName = "MakiWallet.json"
-
-            // 既存の同名ファイルがあれば先に削除（上書き相当）
-            val queryUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
-            resolver.query(queryUri, arrayOf(MediaStore.Downloads._ID), selection, arrayOf(fileName), null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
-                    resolver.delete(Uri.withAppendedPath(queryUri, id.toString()), null, null)
-                }
-            }
-
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(MediaStore.Downloads.MIME_TYPE, "application/json")
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-            }
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return false
-            resolver.openOutputStream(uri)?.use { stream ->
-                stream.write(jsonContent.toByteArray(Charsets.UTF_8))
-            }
-        } else {
-            // Android 9 (API 28) 以下: 直接ファイル操作
-            @Suppress("DEPRECATION")
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) downloadsDir.mkdirs()
-            val file = java.io.File(downloadsDir, "MakiWallet.json")
-            file.writeText(jsonContent, Charsets.UTF_8)
-        }
-        true
-    } catch (e: Exception) {
-        false
-    }
-}
-
-/**
- * 選択された URI から JSON を読み込む（リストア）。
- * @return JSON 文字列、失敗時は null
- */
-fun readJsonFromUri(context: Context, uri: Uri): String? {
-    return try {
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-            stream.readBytes().toString(Charsets.UTF_8)
-        }
-    } catch (e: Exception) {
-        null
-    }
-}
-
 // --- ViewModel ---
 class WalletViewModel(private val dao: TransactionDao) : ViewModel() {
     val balance = dao.getBalanceFlow()
     val recentTransactions = dao.getRecentFlow()
+    val allTransactions = dao.getAllFlow()
 
     fun updateTransaction(transaction: Transaction) {
         viewModelScope.launch {
@@ -217,6 +109,9 @@ class WalletViewModelFactory(private val dao: TransactionDao) : ViewModelProvide
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 縦画面固定（横画面回転を完全に抑止）
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         // OSバージョンによってIME制御戦略を切り替える
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -263,6 +158,8 @@ fun WalletApp(dao: TransactionDao) {
     val viewModel: WalletViewModel = viewModel(factory = WalletViewModelFactory(dao))
     val balance by viewModel.balance.collectAsState(initial = 0)
     val transactions by viewModel.recentTransactions.collectAsState(initial = emptyList())
+    val allTransactions by viewModel.allTransactions.collectAsState(initial = emptyList())
+    var selectedTab by rememberSaveable { mutableStateOf(0) } // 0: メイン, 1: 月別履歴
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var scrollTargetId by remember { mutableStateOf<Long?>(null) }
@@ -288,6 +185,15 @@ fun WalletApp(dao: TransactionDao) {
     var showDeleteConfirmDialog by remember { mutableStateOf<Transaction?>(null) }
     var showRestoreConfirmDialog by remember { mutableStateOf<Uri?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var availableUpdate by remember { mutableStateOf<AppReleaseInfo?>(null) }
+
+    // 起動時に最新バージョンを裏側でチェック
+    LaunchedEffect(Unit) {
+        val update = AppUpdater.checkForUpdate(BuildConfig.VERSION_NAME)
+        if (update != null) {
+            availableUpdate = update
+        }
+    }
 
     // リストア: ファイルピッカーのランチャー
     val restoreLauncher = rememberLauncherForActivityResult(
@@ -372,6 +278,21 @@ fun WalletApp(dao: TransactionDao) {
                             )
                             Divider()
                             DropdownMenuItem(
+                                text = { Text("アップデートを確認") },
+                                onClick = {
+                                    showMenu = false
+                                    scope.launch {
+                                        Toast.makeText(context, "最新バージョンを確認中...", Toast.LENGTH_SHORT).show()
+                                        val update = AppUpdater.checkForUpdate(BuildConfig.VERSION_NAME)
+                                        if (update != null) {
+                                            availableUpdate = update
+                                        } else {
+                                            Toast.makeText(context, "現在ご利用のバージョンは最新です (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("アプリについて", color = Color.Gray) },
                                 onClick = {
                                     showMenu = false
@@ -387,72 +308,118 @@ fun WalletApp(dao: TransactionDao) {
                 modifier = Modifier
                     .padding(innerPadding)
                     .fillMaxSize()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "現在残高",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.Gray
-                )
-                Text(
-                    text = formatCurrency(balance ?: 0),
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 64.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-1).sp
-                    ),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary
                 ) {
-                    ActionButton(
-                        text = "支出",
-                        icon = Icons.Default.Remove,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.weight(1f).height(80.dp)
-                    ) {
-                        transactionType = "expense"
-                        showSheet = true
-                    }
-                    ActionButton(
-                        text = "入金",
-                        icon = Icons.Default.Add,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.weight(1f).height(80.dp)
-                    ) {
-                        transactionType = "income"
-                        showSheet = true
-                    }
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("入力・残高", fontWeight = FontWeight.Bold) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("月別集計", fontWeight = FontWeight.Bold) }
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                if (selectedTab == 0) {
+                    // --- メイン画面 ---
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "現在残高",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = formatCurrency(balance ?: 0),
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 64.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = (-1).sp
+                            ),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Spacer(modifier = Modifier.weight(1f))
 
-                Text(
-                    text = "最近の履歴",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.align(Alignment.Start),
-                    color = Color.Gray
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-        
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    state = listState
-                ) {
-                    items(items = transactions, key = { it.id }) { tx ->
-                        SimpleTransactionItem(tx, onLongClick = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            ActionButton(
+                                text = "支出",
+                                icon = Icons.Default.Remove,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.weight(1f).height(80.dp)
+                            ) {
+                                transactionType = "expense"
+                                showSheet = true
+                            }
+                            ActionButton(
+                                text = "入金",
+                                icon = Icons.Default.Add,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.weight(1f).height(80.dp)
+                            ) {
+                                transactionType = "income"
+                                showSheet = true
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "最近の履歴 (最新20件)",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Color.Gray
+                            )
+                            TextButton(
+                                onClick = { selectedTab = 1 },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text("すべての履歴を見る →", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            state = listState
+                        ) {
+                            items(items = transactions, key = { it.id }) { tx ->
+                                SimpleTransactionItem(tx, onLongClick = {
+                                    editingTransaction = tx
+                                    transactionType = tx.type
+                                    showSheet = true
+                                })
+                            }
+                        }
+                    }
+                } else {
+                    // --- 月別履歴・集計画面 ---
+                    MonthlyHistoryView(
+                        allTransactions = allTransactions,
+                        onTransactionLongClick = { tx ->
                             editingTransaction = tx
                             transactionType = tx.type
                             showSheet = true
-                        })
-                    }
+                        }
+                    )
                 }
             }
         }
@@ -614,93 +581,30 @@ fun WalletApp(dao: TransactionDao) {
 
         // アプリについてダイアログ
         if (showAboutDialog) {
-            val buildType = if (BuildConfig.DEBUG) "DEBUG" else "RELEASE"
-            val buildTypeColor = if (BuildConfig.DEBUG) Color(0xFFD43C35) else Color(0xFF008433)
-            AlertDialog(
-                onDismissRequest = { showAboutDialog = false },
-                title = { Text("アプリについて", fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "まきちゃんのお小遣い帳",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "バージョン",
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = BuildConfig.VERSION_NAME,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "ビルド",
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = buildType,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = buildTypeColor
-                            )
-                        }
+            AboutDialog(onDismiss = { showAboutDialog = false })
+        }
+
+        // アップデート通知ダイアログ
+        val updateInfo = availableUpdate
+        if (updateInfo != null) {
+            UpdateAvailableDialog(
+                releaseInfo = updateInfo,
+                onDismiss = { availableUpdate = null },
+                onUpdateClick = {
+                    val downloadUrl = updateInfo.apkDownloadUrl
+                    if (downloadUrl != null) {
+                        Toast.makeText(context, "ダウンロードを開始しました...", Toast.LENGTH_SHORT).show()
+                        AppUpdater.startDownloadAndInstall(context, downloadUrl, updateInfo.versionName)
+                    } else {
+                        // APK が直接見つからない場合は GitHub Releases ページを開く
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/blacknewo/WalletBalance/releases/latest"))
+                        context.startActivity(intent)
                     }
-                },
-                confirmButton = {
-                    Button(onClick = { showAboutDialog = false }) {
-                        Text("閉じる")
-                    }
+                    availableUpdate = null
                 }
             )
         }
     }
-}
-
-@Composable
-fun ReconciliationDialog(currentBalance: Int, onDismiss: () -> Unit) {
-    var actualBalanceText by remember { mutableStateOf("") }
-    val actualBalance = actualBalanceText.toIntOrNull() ?: 0
-    val diff = actualBalance - currentBalance
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("残高の照合", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("記録上の残高: ${formatCurrency(currentBalance)}")
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = actualBalanceText,
-                    onValueChange = { if (it.all { char -> char.isDigit() }) actualBalanceText = it },
-                    label = { Text("実際の財布の金額") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (actualBalanceText.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "差額: ${if (diff >= 0) "+" else ""}${formatCurrency(diff)}",
-                        color = if (diff == 0) Color(0xFF008433) else Color(0xFFD43C35),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss) {
-                Text("閉じる")
-            }
-        }
-    )
 }
 
 @Composable
@@ -769,223 +673,4 @@ fun SimpleTransactionItem(tx: Transaction, onLongClick: () -> Unit) {
             )
         }
     }
-}
-
-@Composable
-fun InputOverlay(
-    visible: Boolean,
-    type: String,
-    transaction: Transaction? = null,
-    onDismiss: () -> Unit,
-    onSave: (Int, String) -> Unit,
-    onDelete: (Transaction) -> Unit
-) {
-    if (visible) {
-        val focusManager = LocalFocusManager.current
-        // 表示されるたびにオフセットをリセット
-        var dragOffsetY by remember(visible) { mutableStateOf(0f) }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding() // OSバージョンとsoftInputModeに合わせて自動で最適な回避を行う
-        ) {
-            // 背景レイヤー
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha((1f - (dragOffsetY / 600f)).coerceIn(0f, 1f))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { 
-                        focusManager.clearFocus(force = true)
-                        onDismiss() 
-                    }
-            )
-
-            // フォームパネル
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                    .then(
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                            Modifier.border(1.dp, Color.LightGray, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .offset { 
-                        // キーボード回避は imePadding に任せ、ここではドラッグ分のみ計算
-                        IntOffset(0, dragOffsetY.roundToInt().coerceAtLeast(0)) 
-                    }
-                    .draggable(
-                        orientation = Orientation.Vertical,
-                        state = rememberDraggableState { delta ->
-                            dragOffsetY += delta
-                        },
-                        onDragStopped = {
-                            if (dragOffsetY > 300) {
-                                focusManager.clearFocus(force = true)
-                                onDismiss()
-                            } else {
-                                dragOffsetY = 0f
-                            }
-                        }
-                    ),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) 8.dp else 0.dp,
-                shadowElevation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) 8.dp else 0.dp
-            ) {
-                Column {
-                    // ドラッグハンドル
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(top = 8.dp)
-                            .width(36.dp)
-                            .height(4.dp)
-                            .background(Color.LightGray, RoundedCornerShape(2.dp))
-                    )
-                    
-                    InputForm(
-                        type = type,
-                        transaction = transaction,
-                        onSave = { amount, memo ->
-                            focusManager.clearFocus(force = true)
-                            onSave(amount, memo)
-                        },
-                        onDelete = { tx ->
-                            focusManager.clearFocus(force = true)
-                            onDelete(tx)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun InputForm(
-    type: String,
-    transaction: Transaction? = null,
-    onSave: (Int, String) -> Unit,
-    onDelete: (Transaction) -> Unit
-) {
-    val focusManager = LocalFocusManager.current
-    val memoFocusRequester = remember { FocusRequester() }
-
-    // 修正モードなら既存の値を、新規なら空をセット
-    var amountText by rememberSaveable(transaction) { 
-        mutableStateOf(transaction?.amount?.toString() ?: "") 
-    }
-    var memoText by rememberSaveable(transaction) { 
-        mutableStateOf(transaction?.memo ?: "") 
-    }
-    
-    val amount = amountText.toIntOrNull() ?: 0
-    val isValid = amount > 0
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val title = when {
-            transaction != null && type == "income" -> "入金を修正"
-            transaction != null -> "支出を修正"
-            type == "income" -> "入金の記録"
-            else -> "支出の記録"
-        }
-
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = if (type == "income") Color(0xFF008433) else Color(0xFFD43C35)
-        )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-
-        OutlinedTextField(
-            value = amountText,
-            onValueChange = { if (it.all { char -> char.isDigit() }) amountText = it },
-            label = { Text("金額 (¥)") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Next
-            ),
-            keyboardActions = KeyboardActions(
-                onNext = { memoFocusRequester.requestFocus() }
-            ),
-            singleLine = true,
-            textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = memoText,
-            onValueChange = { memoText = it },
-            label = { Text("メモ (任意)") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(memoFocusRequester),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = { focusManager.clearFocus() }
-            ),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = { if (isValid) onSave(amount, memoText) },
-            enabled = isValid,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                if (transaction != null) "修正する" else "保存する",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        if (transaction != null) {
-            Spacer(modifier = Modifier.height(12.dp))
-            TextButton(
-                onClick = { onDelete(transaction) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("この履歴を削除する", color = MaterialTheme.colorScheme.error)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-}
-
-fun formatCurrency(amount: Int): String {
-    return NumberFormat.getCurrencyInstance(Locale.JAPAN).format(amount)
-}
-
-fun formatDate(timestamp: Long): String {
-    val date = Date(timestamp)
-    val sdf = java.text.SimpleDateFormat("MM/dd HH:mm", Locale.JAPAN)
-    return sdf.format(date)
 }

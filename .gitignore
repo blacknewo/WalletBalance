@@ -3,3 +3,12 @@
 *.keystore
 # 署名情報を含む gradle.properties（絶対にコミットしない）
 gradle.properties
+
+# 一時ファイル・大容量ファイル
+*.exe
+*.hprof
+*.pdf
+.gradle/
+build/
+app/build/
+.idea/
